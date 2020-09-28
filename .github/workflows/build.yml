@@ -1,0 +1,46 @@
+
+name: Build
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set up JDK 13
+        uses: actions/setup-java@v1
+        with:
+          java-version: 13
+      - name: Build with Gradle
+        run: ./gradlew
+        env:
+            CI: false
+      - name: Deploy to AWS Beanstalk
+        run: ./gradlew deployStaging
+        env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Archive build
+        uses: actions/upload-artifact@v2
+        with:
+          name: java-app-${{ github.run_number}}
+          path: java-app/build/libs/*.jar
+      - name: When the job fails, send the message on teams channel
+        if: ${{failure()}}
+        uses: jdcargile/ms-teams-notification@v1.2
+        with:
+            github-token: ${{ github.token }}
+            ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+            notification-summary: Build was failed! &#x1F621
+            notification-color: dc3545
+      - name: When the job succeeds, notify the team
+        if: ${{success()}}
+        uses: jdcargile/ms-teams-notification@v1.2
+        with:
+            github-token: ${{ github.token }}
+            ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+            notification-summary: New build was deployed! &#x1F60E
+            notification-color: 28a745
